@@ -43,6 +43,8 @@ class Enlace:
     def __init__(self, linha_serial):
         self.linha_serial = linha_serial
         self.linha_serial.registrar_recebedor(self.__raw_recv)
+        self.dados = b''
+        self.achou_0xdb = False
 
     def registrar_recebedor(self, callback):
         self.callback = callback
@@ -51,7 +53,17 @@ class Enlace:
         # TODO: Preencha aqui com o código para enviar o datagrama pela linha
         # serial, fazendo corretamente a delimitação de quadros e o escape de
         # sequências especiais, de acordo com o protocolo CamadaEnlace (RFC 1055).
-        pass
+        datagrama = bytearray(datagrama)
+        novo_datagrama = b''
+        for character in datagrama:
+            if character == 0xC0:
+                novo_datagrama += b'\xdb\xdc'
+            elif character == 0xDB:
+                novo_datagrama += b'\xdb\xdd'
+            else:
+                novo_datagrama += (int.to_bytes(character, length=1, byteorder="big")) 
+        novo_datagrama = b'\xc0' + novo_datagrama + b'\xc0'
+        self.linha_serial.enviar(novo_datagrama)
 
     def __raw_recv(self, dados):
         # TODO: Preencha aqui com o código para receber dados da linha serial.
@@ -61,4 +73,29 @@ class Enlace:
         # vir quebrado de várias formas diferentes - por exemplo, podem vir
         # apenas pedaços de um quadro, ou um pedaço de quadro seguido de um
         # pedaço de outro, ou vários quadros de uma vez só.
-        pass
+        dados = bytearray(dados)
+
+        for dado in dados:
+            if dado == 0xC0:
+                if len(self.dados) > 0:
+                    dados_enviar = self.dados
+                    self.dados = b''
+                    try:
+                        self.callback(dados_enviar)
+                    except:
+                        # ignora a exceção, mas mostra na tela
+                        import traceback
+                        traceback.print_exc()
+
+            elif dado == 0xDB:
+                self.achou_0xdb = True
+
+            elif self.achou_0xdb:
+                if dado == 0xDC:
+                    self.dados += (int.to_bytes(0xC0, length=1, byteorder="big"))
+                elif dado == 0xDD:
+                    self.dados += (int.to_bytes(0xDB, length=1, byteorder="big")) 
+                self.achou_0xdb = False
+
+            else:
+                self.dados += (int.to_bytes(dado, length=1, byteorder="big"))
