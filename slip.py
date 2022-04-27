@@ -96,6 +96,5 @@ class Enlace:
                 elif dado == 0xDD:
                     self.dados += (int.to_bytes(0xDB, length=1, byteorder="big")) 
                 self.achou_0xdb = False
-
             else:
                 self.dados += (int.to_bytes(dado, length=1, byteorder="big"))
